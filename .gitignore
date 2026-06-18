@@ -1,0 +1,51 @@
+# Laravel
+*.log
+.env
+.env.backup
+.env.production
+.env.*.local
+.phpactor.json
+.phpunit.result.cache
+/auth.json
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.fleet/
+.nova/
+.zed/
+desktop.ini
+*.swp
+*.swo
+
+# Dependencies
+/node_modules
+/vendor
+
+# Build output
+/public/build
+/public/hot
+/public/storage
+
+# Laravel Homestead
+Homestead.json
+Homestead.yaml
+
+# PHPUnit
+/.phpunit.cache
+
+# Database (dùng SQLite local, không đẩy file DB)
+/database/database.sqlite
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
