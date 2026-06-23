@@ -44,6 +44,13 @@ class CategoryController extends Controller
 
     public function destroy(Request $request, Category $category): JsonResponse|RedirectResponse
     {
+        if ($category->items()->exists()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Danh mục đang có món ăn, không thể xóa!'], 422);
+            }
+            return back()->with('error', 'Danh mục đang có món ăn, không thể xóa!');
+        }
+
         $name = $category->name;
         $category->delete();
 

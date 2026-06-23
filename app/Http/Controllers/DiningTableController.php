@@ -13,7 +13,10 @@ class DiningTableController extends Controller
 {
     public function index(): JsonResponse|View
     {
-        $tables = DiningTable::with(['orders' => fn($q) => $q->where('status', 0)->with(['customer', 'employee'])])->orderBy('name')->get();
+        $tables = DiningTable::with([
+            'orders' => fn($q) => $q->where('status', 0)->with(['customer', 'employee']),
+            'extraOrders' => fn($q) => $q->where('status', 0)->with(['customer', 'employee'])
+        ])->orderBy('name')->get();
 
         if (request()->expectsJson()) {
             return response()->json($tables);

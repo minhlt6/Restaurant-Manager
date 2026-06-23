@@ -61,6 +61,13 @@ class CustomerController extends Controller
 
     public function destroy(Request $request, Customer $customer): JsonResponse|RedirectResponse
     {
+        if ($customer->orders()->exists()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Khách hàng đã có hóa đơn, không thể xóa!'], 422);
+            }
+            return back()->with('error', 'Khách hàng đã có hóa đơn, không thể xóa!');
+        }
+
         $name = $customer->name;
         $customer->delete();
 

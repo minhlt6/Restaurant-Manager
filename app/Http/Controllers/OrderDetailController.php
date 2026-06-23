@@ -25,10 +25,22 @@ class OrderDetailController extends Controller
             'order_id' => ['required', 'exists:orders,id'],
             'item_id' => ['required', 'exists:items,id'],
             'quantity' => ['required', 'integer', 'min:1'],
-            'price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $orderDetail = OrderDetail::create($validated);
+        $item = \App\Models\Item::find($validated['item_id']);
+        $validated['price'] = $item->price;
+
+        $existingDetail = OrderDetail::where('order_id', $validated['order_id'])
+            ->where('item_id', $validated['item_id'])
+            ->first();
+
+        if ($existingDetail) {
+            $existingDetail->quantity += $validated['quantity'];
+            $existingDetail->save();
+            $orderDetail = $existingDetail;
+        } else {
+            $orderDetail = OrderDetail::create($validated);
+        }
 
         return $request->expectsJson()
             ? response()->json($orderDetail, 201)
@@ -41,7 +53,6 @@ class OrderDetailController extends Controller
             'order_id' => ['required', 'exists:orders,id'],
             'item_id' => ['required', 'exists:items,id'],
             'quantity' => ['required', 'integer', 'min:1'],
-            'price' => ['required', 'numeric', 'min:0'],
         ]);
 
         $orderDetail->update($validated);

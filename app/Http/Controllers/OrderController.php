@@ -34,7 +34,8 @@ class OrderController extends Controller
             'status'          => ['required', 'integer', 'in:0,1,2'],
             'time_in'         => ['nullable', 'date'],
             // Wholesale
-            'tables_count'    => ['nullable', 'integer', 'min:5'],
+            'extra_tables'    => ['nullable', 'array'],
+            'extra_tables.*'  => ['exists:dining_tables,id'],
             'deposit'         => ['nullable', 'numeric', 'min:0'],
         ]);
 
@@ -43,11 +44,11 @@ class OrderController extends Controller
             $customer = Customer::with('customerGroup')->find($validated['customer_id']);
             if ($customer && str_contains(strtolower($customer->customerGroup->name ?? ''), 'sỉ')) {
                 $request->validate([
-                    'tables_count' => ['required', 'integer', 'min:5'],
+                    'extra_tables' => ['required', 'array', 'min:4'],
                     'deposit'      => ['required', 'numeric', 'min:1'],
                 ], [
-                    'tables_count.required' => 'Khách sỉ phải nhập số bàn (tối thiểu 5 bàn).',
-                    'tables_count.min'      => 'Số bàn tối thiểu là 5 cho khách sỉ.',
+                    'extra_tables.required' => 'Khách sỉ phải chọn thêm bàn (tối thiểu 4 bàn phụ + 1 bàn chính = 5 bàn).',
+                    'extra_tables.min'      => 'Vui lòng chọn thêm ít nhất 4 bàn nữa.',
                     'deposit.required'      => 'Khách sỉ phải có tiền đặt cọc.',
                     'deposit.min'           => 'Tiền đặt cọc phải lớn hơn 0.',
                 ]);
@@ -56,12 +57,29 @@ class OrderController extends Controller
 
         $validated['total_price'] = $validated['deposit'] ?? 0;
         $validated['time_in']     = $validated['time_in'] ?? now();
-        unset($validated['tables_count'], $validated['deposit']);
+        $validated['tables_count'] = isset($validated['extra_tables']) ? count($validated['extra_tables']) + 1 : 1;
+        
+        $extraTables = $validated['extra_tables'] ?? [];
+        unset($validated['extra_tables'], $validated['deposit']);
+
+        // Check if any of the tables are already in use
+        $allTableIds = array_merge([$validated['dining_table_id']], $extraTables);
+        $busyTables = DiningTable::whereIn('id', $allTableIds)
+            ->where('status', '!=', DiningTable::STATUS_FREE)
+            ->count();
+            
+        if ($busyTables > 0) {
+            return back()->with('error', 'Một hoặc nhiều bàn đã được sử dụng hoặc đặt trước!');
+        }
 
         $order = Order::create($validated);
+        
+        if (!empty($extraTables)) {
+            $order->extraDiningTables()->attach($extraTables);
+        }
 
-        // Update table status to serving
-        DiningTable::where('id', $validated['dining_table_id'])->update(['status' => DiningTable::STATUS_SERVING]);
+        // Update table status to serving (main table + extra tables)
+        DiningTable::whereIn('id', $allTableIds)->update(['status' => DiningTable::STATUS_SERVING]);
 
         if ($request->expectsJson()) {
             return response()->json($order, 201);
@@ -97,7 +115,39 @@ class OrderController extends Controller
             'time_out'        => ['nullable', 'date'],
         ]);
 
+        $oldTableId = $order->dining_table_id;
+        $oldStatus  = $order->status;
+        $newTableId = (int)$validated['dining_table_id'];
+        $newStatus  = (int)$validated['status'];
+
+        // If transferring to a new table, ensure it's free
+        if ($oldTableId !== $newTableId && $newStatus === Order::STATUS_UNPAID) {
+            $busy = DiningTable::where('id', $newTableId)->where('status', '!=', DiningTable::STATUS_FREE)->exists();
+            if ($busy) {
+                if ($request->expectsJson()) return response()->json(['message' => 'Bàn mới đã được sử dụng!'], 422);
+                return back()->with('error', 'Bàn mới đã được sử dụng hoặc đặt trước!');
+            }
+        }
+
+        // Free the old table if order is active and table changed
+        if ($oldTableId !== $newTableId && $oldStatus === Order::STATUS_UNPAID) {
+            DiningTable::where('id', $oldTableId)->update(['status' => DiningTable::STATUS_FREE]);
+        }
+
         $order->update($validated);
+
+        // Adjust states based on the new status
+        if ($newStatus === Order::STATUS_UNPAID) {
+            DiningTable::where('id', $newTableId)->update(['status' => DiningTable::STATUS_SERVING]);
+            if ($order->extraDiningTables()->count() > 0) {
+                $order->extraDiningTables()->update(['status' => DiningTable::STATUS_SERVING]);
+            }
+        } else {
+            DiningTable::where('id', $newTableId)->update(['status' => DiningTable::STATUS_FREE]);
+            if ($order->extraDiningTables()->count() > 0) {
+                $order->extraDiningTables()->update(['status' => DiningTable::STATUS_FREE]);
+            }
+        }
 
         return $request->expectsJson()
             ? response()->json($order)
@@ -130,8 +180,11 @@ class OrderController extends Controller
             'time_out'    => now(),
         ]);
 
-        // Free the table
+        // Free the table(s)
         $order->diningTable->update(['status' => DiningTable::STATUS_FREE]);
+        if ($order->extraDiningTables()->count() > 0) {
+            $order->extraDiningTables()->update(['status' => DiningTable::STATUS_FREE]);
+        }
 
         return redirect()->route('dining-tables.index')->with('success', 'Thanh toán thành công! Bàn đã được giải phóng.');
     }
@@ -146,13 +199,29 @@ class OrderController extends Controller
         }
 
         $order->update(['status' => Order::STATUS_CANCELLED, 'time_out' => now()]);
+        
         $order->diningTable->update(['status' => DiningTable::STATUS_FREE]);
+        if ($order->extraDiningTables()->count() > 0) {
+            $order->extraDiningTables()->update(['status' => DiningTable::STATUS_FREE]);
+        }
 
         return redirect()->route('dining-tables.index')->with('success', 'Đã hủy hóa đơn và giải phóng bàn.');
     }
 
     public function destroy(Request $request, Order $order): JsonResponse|RedirectResponse
     {
+        // Free tables if order is unpaid
+        if ($order->status === Order::STATUS_UNPAID) {
+            $order->diningTable->update(['status' => DiningTable::STATUS_FREE]);
+            if ($order->extraDiningTables()->count() > 0) {
+                $order->extraDiningTables()->update(['status' => DiningTable::STATUS_FREE]);
+            }
+        }
+
+        // Clean up relations to prevent orphan data
+        $order->orderDetails()->delete();
+        $order->extraDiningTables()->detach();
+
         $order->delete();
 
         return $request->expectsJson()

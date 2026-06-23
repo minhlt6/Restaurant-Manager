@@ -38,7 +38,7 @@
                 default => 'N/A'
             };
             $statusData = match($table->status) { 0 => 'free', 1 => 'serving', 2 => 'reserved', default => 'free' };
-            $activeOrder = $table->orders->where('status', 0)->first();
+            $activeOrder = $table->orders->where('status', 0)->first() ?? $table->extraOrders->where('status', 0)->first();
         @endphp
         <div class="table-card card-glass rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg fade-in" data-status="{{ $statusData }}"
             onclick="handleTableClick({{ $table->id }}, {{ $table->status }}, {{ $activeOrder ? $activeOrder->id : 'null' }})">
@@ -107,11 +107,17 @@
                 <div id="wholesale-warning" class="hidden p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 text-sm">
                     ⚠️ <strong>Khách sỉ / Đặt tiệc</strong>: Yêu cầu tối thiểu 5 bàn.
                     <div class="mt-2">
-                        <label class="block text-xs text-amber-300 mb-1">Số bàn đặt tiệc *</label>
-                        <input type="number" name="tables_count" id="ot-tables-count" min="5" placeholder="Tối thiểu 5 bàn"
-                            class="w-full bg-slate-800 border border-amber-500/40 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+                        <label class="block text-xs text-amber-300 mb-1">Chọn thêm các bàn khác (ít nhất 4 bàn) *</label>
+                        <div class="max-h-32 overflow-y-auto bg-slate-800 border border-amber-500/40 rounded-xl p-2 space-y-1">
+                            @foreach($tables->where('status', 0) as $t)
+                            <label class="flex items-center gap-2 p-1.5 hover:bg-slate-700/50 rounded cursor-pointer text-slate-200 extra-table-label" data-id="{{ $t->id }}">
+                                <input type="checkbox" name="extra_tables[]" value="{{ $t->id }}" class="extra-table-checkbox rounded bg-slate-700 border-slate-600 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-800">
+                                {{ $t->name }} ({{ $t->capacity }} người)
+                            </label>
+                            @endforeach
+                        </div>
                     </div>
-                    <div class="mt-2">
+                    <div class="mt-3">
                         <label class="block text-xs text-amber-300 mb-1">Tiền đặt cọc (VNĐ) *</label>
                         <input type="number" name="deposit" id="ot-deposit" min="0" placeholder="Nhập số tiền đặt cọc"
                             class="w-full bg-slate-800 border border-amber-500/40 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
@@ -162,6 +168,17 @@
             document.getElementById('ot-time-in').value = new Date().toISOString().slice(0, 19).replace('T', ' ');
             const card = document.querySelector(`[onclick*="handleTableClick(${tableId},"]`);
             document.getElementById('ot-table-name').textContent = card.querySelector('.font-bold.text-white').textContent;
+            
+            // Hide the current table from extra tables list
+            document.querySelectorAll('.extra-table-label').forEach(el => {
+                if (el.dataset.id == tableId) {
+                    el.style.display = 'none';
+                    el.querySelector('input').checked = false;
+                } else {
+                    el.style.display = 'flex';
+                }
+            });
+
             document.getElementById('modal-open-table').classList.remove('hidden');
             document.getElementById('modal-open-table').classList.add('flex');
         } else if (status === 1 && orderId) {
@@ -197,12 +214,24 @@
         const warning = document.getElementById('wholesale-warning');
         if (group.toLowerCase().includes('sỉ')) {
             warning.classList.remove('hidden');
-            document.getElementById('ot-tables-count').required = true;
             document.getElementById('ot-deposit').required = true;
         } else {
             warning.classList.add('hidden');
-            document.getElementById('ot-tables-count').required = false;
             document.getElementById('ot-deposit').required = false;
+            // Uncheck extra tables
+            document.querySelectorAll('.extra-table-checkbox').forEach(cb => cb.checked = false);
+        }
+    });
+
+    // Form validation before submit
+    document.getElementById('open-table-form').addEventListener('submit', function(e) {
+        const warning = document.getElementById('wholesale-warning');
+        if (!warning.classList.contains('hidden')) {
+            const checkedBoxes = document.querySelectorAll('.extra-table-checkbox:checked');
+            if (checkedBoxes.length < 4) {
+                e.preventDefault();
+                alert('Khách sỉ vui lòng chọn thêm ít nhất 4 bàn nữa (tổng 5 bàn).');
+            }
         }
     });
 

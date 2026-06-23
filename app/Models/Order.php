@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model
@@ -35,6 +36,11 @@ class Order extends Model
     public function diningTable(): BelongsTo
     {
         return $this->belongsTo(DiningTable::class);
+    }
+
+    public function extraDiningTables(): BelongsToMany
+    {
+        return $this->belongsToMany(DiningTable::class, 'order_dining_tables');
     }
 
     public function employee(): BelongsTo

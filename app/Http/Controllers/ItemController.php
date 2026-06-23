@@ -59,6 +59,13 @@ class ItemController extends Controller
 
     public function destroy(Request $request, Item $item): JsonResponse|RedirectResponse
     {
+        if ($item->orderDetails()->exists()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Món ăn đã có trong hóa đơn, không thể xóa!'], 422);
+            }
+            return back()->with('error', 'Món ăn đã có trong hóa đơn, không thể xóa!');
+        }
+
         $name = $item->name;
         $item->delete();
 

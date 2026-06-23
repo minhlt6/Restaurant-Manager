@@ -75,6 +75,13 @@ class EmployeeController extends Controller
             return back()->with('error', 'Không thể xóa tài khoản đang đăng nhập!');
         }
 
+        if ($employee->orders()->exists()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Nhân viên đã xử lý hóa đơn, không thể xóa!'], 422);
+            }
+            return back()->with('error', 'Nhân viên đã xử lý hóa đơn, không thể xóa!');
+        }
+
         $name = $employee->name;
         $employee->delete();
 

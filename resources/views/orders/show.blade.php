@@ -14,7 +14,7 @@
         </button>
     </form>
     <form method="POST" action="{{ route('orders.checkout', $order) }}" id="checkout-form">
-        @csrf
+        @csrf @method('PATCH')
         <button type="button" onclick="showCheckout()" class="btn-primary px-4 py-2 rounded-xl text-slate-950 font-bold text-sm">
             💳 Thanh toán
         </button>
@@ -182,7 +182,7 @@
             </div>
             <div class="flex gap-3 mt-5">
                 <form method="POST" action="{{ route('orders.checkout', $order) }}" class="flex-1">
-                    @csrf
+                    @csrf @method('PATCH')
                     <button type="submit" class="btn-primary w-full py-3 rounded-xl text-slate-950 font-bold">
                         ✅ Xác nhận thanh toán
                     </button>
