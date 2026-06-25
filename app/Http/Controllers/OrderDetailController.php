@@ -42,6 +42,8 @@ class OrderDetailController extends Controller
             $orderDetail = OrderDetail::create($validated);
         }
 
+        $this->updateOrderTotal((int)$validated['order_id']);
+
         return $request->expectsJson()
             ? response()->json($orderDetail, 201)
             : redirect()->route('order-details.index');
@@ -57,6 +59,8 @@ class OrderDetailController extends Controller
 
         $orderDetail->update($validated);
 
+        $this->updateOrderTotal((int)$validated['order_id']);
+
         return $request->expectsJson()
             ? response()->json($orderDetail)
             : redirect()->route('order-details.index');
@@ -64,7 +68,10 @@ class OrderDetailController extends Controller
 
     public function destroy(Request $request, OrderDetail $orderDetail): JsonResponse|RedirectResponse
     {
+        $orderId = $orderDetail->order_id;
         $orderDetail->delete();
+
+        $this->updateOrderTotal((int)$orderId);
 
         return $request->expectsJson()
             ? response()->json(['message' => 'Deleted'])
@@ -84,5 +91,19 @@ class OrderDetailController extends Controller
     public function edit(OrderDetail $orderDetail): never
     {
         abort(404);
+    }
+
+    private function updateOrderTotal(int $orderId): void
+    {
+        $order = \App\Models\Order::with(['customer.customerGroup', 'orderDetails'])->find($orderId);
+        if (!$order) return;
+
+        $subtotal = $order->orderDetails->sum(fn($d) => $d->price * $d->quantity);
+        $isWholesale = $order->customer && str_contains(strtolower($order->customer->customerGroup->name ?? ''), 'sỉ');
+        $discountPct = $isWholesale ? 10 : 0;
+        $discount = $subtotal * ($discountPct / 100);
+        $total = $subtotal - $discount;
+
+        $order->update(['total_price' => $total]);
     }
 }

@@ -64,15 +64,27 @@
             </div>
             <div id="order-items-list" class="space-y-2 min-h-16">
                 @forelse($order->orderDetails as $detail)
-                <div class="flex items-center gap-2 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50" id="detail-row-{{ $detail->id }}">
+                <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50" 
+                     id="detail-row-{{ $detail->id }}" 
+                     data-detail-id="{{ $detail->id }}"
+                     data-item-id="{{ $detail->item_id }}"
+                     data-price="{{ $detail->price }}"
+                     data-qty="{{ $detail->quantity }}">
                     <div class="flex-1 min-w-0">
                         <div class="text-sm font-medium text-white truncate">{{ $detail->item->name }}</div>
-                        <div class="text-xs text-slate-400">{{ number_format($detail->price, 0, ',', '.') }}đ × {{ $detail->quantity }}</div>
+                        <div class="text-xs text-slate-400" id="row-price-qty-{{ $detail->id }}">{{ number_format($detail->price, 0, ',', '.') }}đ × <span class="qty-val">{{ $detail->quantity }}</span></div>
                     </div>
-                    <div class="text-right">
-                        <div class="text-sm font-bold text-amber-400">{{ number_format($detail->price * $detail->quantity, 0, ',', '.') }}đ</div>
+                    @if($order->status === 0)
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="updateQty({{ $detail->id }}, -1)" class="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-bold flex items-center justify-center transition-all">-</button>
+                        <span class="qty-display-span text-sm font-semibold text-white px-1 text-center min-w-[20px]">{{ $detail->quantity }}</span>
+                        <button onclick="updateQty({{ $detail->id }}, 1)" class="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-bold flex items-center justify-center transition-all">+</button>
+                    </div>
+                    @endif
+                    <div class="text-right shrink-0">
+                        <div class="text-sm font-bold text-amber-400" id="row-subtotal-{{ $detail->id }}">{{ number_format($detail->price * $detail->quantity, 0, ',', '.') }}đ</div>
                         @if($order->status === 0)
-                        <button onclick="removeDetail({{ $detail->id }})" class="text-xs text-red-400 hover:text-red-300 mt-0.5">Xóa</button>
+                        <button onclick="removeDetail({{ $detail->id }})" class="text-xs text-red-400 hover:text-red-300 mt-0.5 block ml-auto">Xóa</button>
                         @endif
                     </div>
                 </div>
@@ -241,31 +253,61 @@
 
         if (res.ok) {
             const detail = await res.json();
-            currentSubtotal += itemPrice * qty;
+            const fmt = v => new Intl.NumberFormat('vi-VN').format(v) + 'đ';
+            
+            // Check if row already exists
+            const existingRow = document.getElementById('detail-row-' + detail.id);
 
-            // Remove empty msg if present
-            const emptyMsg = document.getElementById('empty-msg');
-            if (emptyMsg) emptyMsg.remove();
+            if (existingRow) {
+                // Update quantity and subtotal on existing row
+                const oldQty = parseInt(existingRow.dataset.qty);
+                const newQty = oldQty + qty;
+                existingRow.dataset.qty = newQty;
+                
+                existingRow.querySelector('.qty-val').textContent = newQty;
+                const qtySpan = existingRow.querySelector('.qty-display-span');
+                if (qtySpan) qtySpan.textContent = newQty;
+                
+                document.getElementById('row-subtotal-' + detail.id).textContent = fmt(itemPrice * newQty);
+                
+                currentSubtotal += itemPrice * qty;
+            } else {
+                currentSubtotal += itemPrice * qty;
 
-            // Add row
-            const list = document.getElementById('order-items-list');
-            const row  = document.createElement('div');
-            row.className = 'flex items-center gap-2 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 fade-in';
-            row.id = 'detail-row-' + detail.id;
-            row.innerHTML = `
-                <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-white truncate">${itemName}</div>
-                    <div class="text-xs text-slate-400">${new Intl.NumberFormat('vi-VN').format(itemPrice)}đ × ${qty}</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-sm font-bold text-amber-400">${new Intl.NumberFormat('vi-VN').format(itemPrice * qty)}đ</div>
-                    <button onclick="removeDetail(${detail.id}, ${itemPrice * qty})" class="text-xs text-red-400 hover:text-red-300 mt-0.5">Xóa</button>
-                </div>`;
-            list.appendChild(row);
+                // Remove empty msg if present
+                const emptyMsg = document.getElementById('empty-msg');
+                if (emptyMsg) emptyMsg.remove();
+
+                // Add row
+                const list = document.getElementById('order-items-list');
+                const row  = document.createElement('div');
+                row.className = 'flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 fade-in';
+                row.id = 'detail-row-' + detail.id;
+                row.dataset.detailId = detail.id;
+                row.dataset.itemId = itemId;
+                row.dataset.price = itemPrice;
+                row.dataset.qty = qty;
+                row.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-white truncate">${itemName}</div>
+                        <div class="text-xs text-slate-400" id="row-price-qty-${detail.id}">${fmt(itemPrice)} × <span class="qty-val">${qty}</span></div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="updateQty(${detail.id}, -1)" class="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-bold flex items-center justify-center transition-all">-</button>
+                        <span class="qty-display-span text-sm font-semibold text-white px-1 text-center min-w-[20px]">${qty}</span>
+                        <button onclick="updateQty(${detail.id}, 1)" class="w-6 h-6 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-bold flex items-center justify-center transition-all">+</button>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-sm font-bold text-amber-400" id="row-subtotal-${detail.id}">${fmt(itemPrice * qty)}</div>
+                        <button onclick="removeDetail(${detail.id})" class="text-xs text-red-400 hover:text-red-300 mt-0.5 block ml-auto">Xóa</button>
+                    </div>`;
+                list.appendChild(row);
+            }
 
             // Update count badge
+            const list = document.getElementById('order-items-list');
             const badge = document.getElementById('total-items-count');
-            badge.textContent = (list.children.length) + ' món';
+            badge.textContent = list.querySelectorAll('[id^="detail-row-"]').length + ' món';
 
             updateTotals();
         } else {
@@ -273,13 +315,66 @@
         }
     }
 
-    async function removeDetail(detailId, amount) {
+    async function updateQty(detailId, change) {
+        const row = document.getElementById('detail-row-' + detailId);
+        if (!row) return;
+
+        const currentQty = parseInt(row.dataset.qty);
+        const newQty = currentQty + change;
+        const price = parseFloat(row.dataset.price);
+        const itemId = parseInt(row.dataset.itemId);
+
+        if (newQty < 1) {
+            removeDetail(detailId);
+            return;
+        }
+
+        const res = await fetch(`/order-details/${detailId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+                order_id: orderId,
+                item_id: itemId,
+                quantity: newQty
+            })
+        });
+
+        if (res.ok) {
+            const detail = await res.json();
+            const difference = (newQty - currentQty) * price;
+            currentSubtotal += difference;
+            
+            // Update row dataset and UI
+            row.dataset.qty = newQty;
+            
+            // Update subtotal display of this row
+            const fmt = v => new Intl.NumberFormat('vi-VN').format(v) + 'đ';
+            document.getElementById('row-subtotal-' + detailId).textContent = fmt(price * newQty);
+            
+            // Update quantity display in the middle span and label
+            row.querySelector('.qty-val').textContent = newQty;
+            const qtySpan = row.querySelector('.qty-display-span');
+            if (qtySpan) qtySpan.textContent = newQty;
+
+            updateTotals();
+        } else {
+            alert('Lỗi khi cập nhật số lượng.');
+        }
+    }
+
+    async function removeDetail(detailId) {
         if (!confirm('Xóa món này khỏi đơn?')) return;
+
+        const row = document.getElementById('detail-row-' + detailId);
+        if (!row) return;
+        const price = parseFloat(row.dataset.price);
+        const qty = parseInt(row.dataset.qty);
+        const amount = price * qty;
 
         const res = await fetch(`/order-details/${detailId}`, { method: 'DELETE', headers });
         if (res.ok) {
-            const row = document.getElementById('detail-row-' + detailId);
-            if (row) { currentSubtotal -= (amount || 0); row.remove(); }
+            currentSubtotal -= amount;
+            row.remove();
             updateTotals();
 
             const list = document.getElementById('order-items-list');

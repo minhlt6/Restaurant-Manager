@@ -93,6 +93,8 @@
 
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-2">Khách hàng <span class="text-slate-500">(tùy chọn)</span></label>
+                    <input type="text" id="ot-customer-search" placeholder="🔍 Tìm nhanh theo tên hoặc SĐT..." 
+                           class="w-full mb-2 bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-300 focus:border-amber-400/50 focus:outline-none">
                     <select name="customer_id" id="ot-customer" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:border-amber-400/50 focus:outline-none">
                         <option value="">— Khách vãng lai —</option>
                         @foreach($customers as $c)
@@ -195,6 +197,16 @@
         if (!event || event.target === document.getElementById('modal-open-table')) {
             document.getElementById('modal-open-table').classList.add('hidden');
             document.getElementById('modal-open-table').classList.remove('flex');
+            
+            // Reset customer search input and options display
+            const searchInput = document.getElementById('ot-customer-search');
+            if (searchInput) {
+                searchInput.value = '';
+                const select = document.getElementById('ot-customer');
+                for (let opt of select.options) {
+                    opt.style.display = "";
+                }
+            }
         }
     }
 
@@ -206,6 +218,21 @@
     }
 
     function goToOrder() { window.location.href = `/orders/${currentOrderId}`; }
+
+    // Search customer in select option
+    document.getElementById('ot-customer-search')?.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        const select = document.getElementById('ot-customer');
+        for (let opt of select.options) {
+            if (opt.value === "") continue; // Skip default option
+            const text = opt.textContent.toLowerCase();
+            if (text.includes(q)) {
+                opt.style.display = "";
+            } else {
+                opt.style.display = "none";
+            }
+        }
+    });
 
     // Wholesale customer detection
     document.getElementById('ot-customer').addEventListener('change', function() {
