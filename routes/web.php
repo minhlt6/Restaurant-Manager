@@ -11,6 +11,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderDetailController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -40,6 +41,11 @@ Route::middleware('role:staff,manager')->group(function (): void {
 
     // Customers — staff can add/edit
     Route::resource('customers', CustomerController::class);
+
+    // Reservations — staff can create/cancel/receive
+    Route::post('/reservations',                            [ReservationController::class, 'store'])->name('reservations.store');
+    Route::patch('/reservations/{reservation}/cancel',      [ReservationController::class, 'cancel'])->name('reservations.cancel');
+    Route::post('/reservations/{reservation}/receive',      [ReservationController::class, 'receive'])->name('reservations.receive');
 
     // Manager-only routes
     Route::middleware('role:manager')->group(function (): void {

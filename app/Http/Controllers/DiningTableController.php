@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\DiningTable;
+use App\Models\Employee;
+use App\Models\Reservation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,8 +16,9 @@ class DiningTableController extends Controller
     public function index(): JsonResponse|View
     {
         $tables = DiningTable::with([
-            'orders' => fn($q) => $q->where('status', 0)->with(['customer', 'employee']),
-            'extraOrders' => fn($q) => $q->where('status', 0)->with(['customer', 'employee'])
+            'orders'       => fn($q) => $q->where('status', 0)->with(['customer', 'employee']),
+            'extraOrders'  => fn($q) => $q->where('status', 0)->with(['customer', 'employee']),
+            'reservations' => fn($q) => $q->where('status', Reservation::STATUS_WAITING)->orderBy('reservation_time'),
         ])->orderBy('name')->get();
 
         if (request()->expectsJson()) {
@@ -23,13 +26,15 @@ class DiningTableController extends Controller
         }
 
         $customers = Customer::with('customerGroup')->orderBy('name')->get();
+        $employees = Employee::orderBy('name')->get();
 
         return view('dining-tables.index', [
-            'tables'        => $tables,
-            'freeTables'    => $tables->where('status', 0)->count(),
-            'servingTables' => $tables->where('status', 1)->count(),
-            'reservedTables'=> $tables->where('status', 2)->count(),
-            'customers'     => $customers,
+            'tables'         => $tables,
+            'freeTables'     => $tables->where('status', 0)->count(),
+            'servingTables'  => $tables->where('status', 1)->count(),
+            'reservedTables' => $tables->where('status', 2)->count(),
+            'customers'      => $customers,
+            'employees'      => $employees,
         ]);
     }
 
