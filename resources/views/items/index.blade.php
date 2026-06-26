@@ -153,7 +153,7 @@
         if (!confirm(`Xóa món "${name}"?`)) return;
         const res = await fetch(`/items/${id}`, { method: 'DELETE', headers });
         if (res.ok) location.reload();
-        else alert('Không thể xóa! Món đang có trong hóa đơn.');
+        else alert('Không thể xóa!');
     }
 
     // Search & filter
