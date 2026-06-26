@@ -71,7 +71,7 @@
                      data-price="{{ $detail->price }}"
                      data-qty="{{ $detail->quantity }}">
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-white truncate">{{ $detail->item->name }}</div>
+                        <div class="text-sm font-medium text-white truncate">{{ $detail->item?->name ?? 'Món đã xóa' }}</div>
                         <div class="text-xs text-slate-400" id="row-price-qty-{{ $detail->id }}">{{ number_format($detail->price, 0, ',', '.') }}đ × <span class="qty-val">{{ $detail->quantity }}</span></div>
                     </div>
                     @if($order->status === 0)

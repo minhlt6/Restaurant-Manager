@@ -104,7 +104,7 @@
         if (!confirm(`Xóa danh mục "${name}"?`)) return;
         const res = await fetch(`/categories/${id}`, { method: 'DELETE', headers });
         if (res.ok) { document.getElementById('cat-row-'+id)?.remove(); }
-        else { alert('Không thể xóa! Có thể danh mục đang có món ăn.'); }
+        else { alert('Không thể xóa!'); }
     }
 </script>
 @endpush
